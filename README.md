@@ -1,6 +1,6 @@
 # HTML Parser
 
-Analizador de código fuente HTML que se ejecuta 100% en el navegador (client-side). Pega o sube un archivo `.html` y obtén un desglose completo: metadatos SEO, enlaces, imágenes, tablas, formularios, scripts, conteo de etiquetas, texto plano y otros hallazgos (JSON-LD, comentarios ocultos, emails, colores).
+Analizador de código fuente HTML que se ejecuta 100% en el navegador (client-side). Pega o sube un archivo `.html` y obtén un desglose completo: metadatos SEO, enlaces, imágenes, tablas, formularios, scripts, conteo de etiquetas, texto plano y otros hallazgos (JSON-LD, comentarios ocultos, emails, colores). 
 
 No hay backend. No hay paso de compilación (bundling): los módulos JS se cargan nativamente en el navegador vía `<script type="module">`. Es instalable como PWA y funciona offline tras la primera visita.
 
