@@ -1,0 +1,16 @@
+{
+  "name": "html-parser",
+  "version": "0.2.0",
+  "description": "Analizador de código fuente HTML, 100% client-side.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "npx serve .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.4",
+    "jsdom": "^25.0.1"
+  }
+}

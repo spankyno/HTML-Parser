@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>HTML Parser — Analizador de código fuente</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Analiza el código fuente de cualquier página HTML: SEO, enlaces, imágenes, tablas, formularios y más. Todo en el navegador.">
+<meta name="theme-color" content="#0B1626">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark">&lt;/&gt;</span>
+    <div>
+      <h1>HTML Parser</h1>
+      <p>pega el código fuente, obtén su anatomía completa</p>
+    </div>
+  </div>
+  <div class="hint" id="statusline">esperando código fuente…</div>
+</header>
+
+<main>
+  <div class="input-block">
+    <div class="row modetabs">
+      <button class="modetab active" id="modeSingleBtn" type="button">Analizar un HTML</button>
+      <button class="modetab" id="modeCompareBtn" type="button">Comparar dos versiones</button>
+    </div>
+
+    <div id="singleInput">
+      <div class="row">
+        <label class="filebtn">
+          subir archivo .html
+          <input type="file" id="fileInput" accept=".html,.htm,text/html" style="display:none">
+        </label>
+        <span class="hint">o pega el código directamente abajo</span>
+      </div>
+      <textarea id="src" placeholder="&lt;html&gt;...&lt;/html&gt;  — pega aquí el código fuente completo de una página"></textarea>
+      <div class="actions">
+        <button id="analyzeBtn">Analizar código</button>
+        <button class="ghost" id="clearBtn">Limpiar</button>
+        <button class="ghost" id="exampleBtn">Cargar ejemplo</button>
+        <span class="hint" id="charcount"></span>
+      </div>
+    </div>
+
+    <div id="compareInput" style="display:none;">
+      <div class="comparecols">
+        <div>
+          <div class="row">
+            <label class="filebtn">subir A
+              <input type="file" id="fileInputA" accept=".html,.htm,text/html" style="display:none">
+            </label>
+            <span class="hint">Versión A (antes)</span>
+          </div>
+          <textarea id="srcA" placeholder="pega aquí la versión ANTES del HTML"></textarea>
+        </div>
+        <div>
+          <div class="row">
+            <label class="filebtn">subir B
+              <input type="file" id="fileInputB" accept=".html,.htm,text/html" style="display:none">
+            </label>
+            <span class="hint">Versión B (después)</span>
+          </div>
+          <textarea id="srcB" placeholder="pega aquí la versión DESPUÉS del HTML"></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="compareBtn">Comparar versiones</button>
+        <button class="ghost" id="clearCompareBtn">Limpiar</button>
+        <button class="ghost" id="exampleCompareBtn">Cargar ejemplo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout" id="layout" style="display:none;">
+    <nav class="modules" id="moduleNav"></nav>
+    <section class="results">
+      <div class="panelhead">
+        <div>
+          <h2 id="panelTitle">Módulo</h2>
+          <div class="sub" id="panelSub"></div>
+        </div>
+        <div class="panelhead-controls">
+          <input type="text" id="filterbox" placeholder="filtrar filas…">
+          <div class="exportbar" id="exportbar"></div>
+        </div>
+      </div>
+      <div class="panelbody" id="panelBody"></div>
+    </section>
+  </div>
+
+  <div class="layout" id="emptyState">
+    <div></div>
+    <div class="empty" style="border:1px dashed var(--line); grid-column: 1/-1;">
+      Pega o sube un HTML y pulsa «Analizar código» para ver el desglose.
+    </div>
+  </div>
+</main>
+
+<footer class="note">
+  Todo el análisis ocurre en tu navegador — el código pegado nunca se envía a ningún servidor. Si el HTML pegado no incluye hojas de estilo externas, los colores/fuentes definidos en ellas no serán visibles. Instalable como app (PWA): funciona sin conexión tras la primera visita.
+</footer>
+
+<script type="module" src="./src/app.js"></script>
+</body>
+</html>
