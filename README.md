@@ -67,6 +67,16 @@ git remote add origin https://github.com/TU-USUARIO/html-parser.git
 git push -u origin main
 ```
 
+### Sobre el tipo de proyecto: Workers (static assets) vs. Pages clásico
+
+Si tu proyecto en Cloudflare fue creado como **Worker con assets estáticos** (el modelo con el que Cloudflare está sustituyendo Pages) en vez de como un proyecto **Pages** clásico, necesita configuración explícita — si no, intenta ejecutar `wrangler deploy` tratando **todo el repo** como si fueran los assets a servir, lo que incluye `node_modules` (y con él, el binario de `workerd` que instala Wrangler, de más de 100 MB) y falla por tamaño.
+
+El repo ya incluye lo necesario para este caso:
+- **`wrangler.jsonc`** — declara qué carpeta servir (`.`) como assets estáticos, sin script de Worker (`main`) porque no hace falta: es un sitio puramente estático.
+- **`.assetsignore`** — excluye `node_modules`, `.git`, tests y ficheros de desarrollo de lo que se sube como assets.
+
+Si prefieres el modelo Pages clásico en vez de Workers con assets, la alternativa es borrar el proyecto actual en el dashboard de Cloudflare y crearlo de nuevo eligiendo explícitamente **Workers & Pages → Create → Pages** (no "Workers") → Connect to Git, siguiendo la configuración de la sección de abajo.
+
 ### Opción A — Conectar el repo desde el dashboard (recomendada)
 
 1. Entra en el dashboard de Cloudflare → **Workers & Pages → Create → Pages → Connect to Git**.
@@ -85,15 +95,13 @@ git push -u origin main
 
 ### Opción B — Deploy desde la CLI con Wrangler
 
-El repo ya incluye `wrangler.toml` con la configuración mínima:
-
 ```bash
 npm install -g wrangler
 wrangler login
-wrangler pages deploy . --project-name=html-parser
+wrangler deploy
 ```
 
-Esto crea el proyecto en Cloudflare Pages si no existe y sube el contenido tal cual, sin conectar GitHub (útil para probar antes de automatizarlo, o si prefieres desplegar manualmente).
+Con `wrangler.jsonc` ya configurado como Worker de solo-assets, `wrangler deploy` (no `wrangler pages deploy`) es ahora el comando correcto — sube el contenido de `.` como assets estáticos, excluyendo lo listado en `.assetsignore`.
 
 ### Cabeceras (`_headers`)
 
