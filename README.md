@@ -77,6 +77,12 @@ El repo ya incluye lo necesario para este caso:
 
 Si prefieres el modelo Pages clásico en vez de Workers con assets, la alternativa es borrar el proyecto actual en el dashboard de Cloudflare y crearlo de nuevo eligiendo explícitamente **Workers & Pages → Create → Pages** (no "Workers") → Connect to Git, siguiendo la configuración de la sección de abajo.
 
+### "No hay direcciones URL habilitadas" tras un build correcto
+
+Esto significa que el Worker se desplegó bien, pero no tiene ninguna URL pública activada — ni el subdominio `tu-proyecto.tu-cuenta.workers.dev`, ni un dominio/ruta propia. `wrangler.jsonc` ya incluye `"workers_dev": true` para que el siguiente deploy lo active automáticamente.
+
+Si tras volver a desplegar sigue sin aparecer la URL, actívalo a mano: en el dashboard del Worker → **Settings → Domains & Routes** → activa el toggle de **Enable workers.dev subdomain**. Desde ahí también puedes añadir un dominio propio en vez del subdominio de workers.dev.
+
 ### Opción A — Conectar el repo desde el dashboard (recomendada)
 
 1. Entra en el dashboard de Cloudflare → **Workers & Pages → Create → Pages → Connect to Git**.
