@@ -1,0 +1,26 @@
+# Cloudflare Pages lee este fichero automáticamente y aplica las cabeceras
+# indicadas a las rutas que coincidan. Documentación:
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+# El service worker NUNCA debe cachearse agresivamente: si el navegador lo
+# sirve desde caché antigua, los usuarios pueden quedarse atascados en una
+# versión vieja de la app indefinidamente.
+/service-worker.js
+  Cache-Control: no-cache
+
+/manifest.json
+  Cache-Control: no-cache
+
+# El resto de assets estáticos (CSS/JS con el mismo nombre en cada deploy)
+# pueden cachearse un rato razonable sin arriesgar a servir código viejo.
+/style.css
+  Cache-Control: public, max-age=3600
+
+/src/*
+  Cache-Control: public, max-age=3600
+
+# Cabeceras de seguridad básicas para todo el sitio.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY

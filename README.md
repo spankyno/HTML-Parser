@@ -51,22 +51,63 @@ La GitHub Action en `.github/workflows/test.yml` corre esta misma suite en cada 
 
 ## Despliegue en Cloudflare Pages
 
-Sigue sin haber build step real (los módulos se sirven tal cual):
+No hay build step real (los módulos se sirven tal cual como ES modules nativos del navegador).
 
-1. Sube este repositorio a GitHub.
-2. En el dashboard de Cloudflare: **Workers & Pages → Create → Pages → Connect to Git**, selecciona el repo.
+### ⚠️ Importante sobre la estructura del repo
+
+El zip que descargaste contiene una carpeta `hp2/` por comodidad al empaquetarlo. **Sube el CONTENIDO de esa carpeta a la raíz de tu repositorio de GitHub**, no la carpeta `hp2` en sí — si no, `index.html` quedará en `hp2/index.html` en vez de en la raíz, y Cloudflare no lo encontrará donde espera.
+
+```bash
+# Desde dentro de la carpeta descomprimida hp2/
+git init
+git add .
+git commit -m "HTML Parser v1"
+git branch -M main
+git remote add origin https://github.com/TU-USUARIO/html-parser.git
+git push -u origin main
+```
+
+### Opción A — Conectar el repo desde el dashboard (recomendada)
+
+1. Entra en el dashboard de Cloudflare → **Workers & Pages → Create → Pages → Connect to Git**.
+2. Selecciona el repositorio `html-parser` (o el nombre que le hayas puesto).
 3. Configuración de build:
-   - **Framework preset**: `None`
-   - **Build command**: *(vacío)*
-   - **Build output directory**: `/`
-4. Guarda y despliega. Cada push a `main` actualiza el sitio.
 
-Alternativa desde la CLI:
+   | Campo | Valor |
+   |---|---|
+   | Framework preset | `None` |
+   | Build command | *(vacío)* |
+   | Build output directory | `/` |
+   | Root directory | `/` *(a menos que hayas subido el repo con la carpeta `hp2/` dentro, en cuyo caso pon `/hp2`)* |
+
+4. No hace falta ninguna variable de entorno — no hay backend.
+5. **Save and Deploy**. Cada push a `main` vuelve a desplegar automáticamente; los PRs generan un preview con su propia URL.
+
+### Opción B — Deploy desde la CLI con Wrangler
+
+El repo ya incluye `wrangler.toml` con la configuración mínima:
 
 ```bash
 npm install -g wrangler
+wrangler login
 wrangler pages deploy . --project-name=html-parser
 ```
+
+Esto crea el proyecto en Cloudflare Pages si no existe y sube el contenido tal cual, sin conectar GitHub (útil para probar antes de automatizarlo, o si prefieres desplegar manualmente).
+
+### Cabeceras (`_headers`)
+
+El repo incluye un fichero `_headers` que Cloudflare Pages detecta automáticamente. Es importante especialmente para `service-worker.js`: fuerza `Cache-Control: no-cache` para que los usuarios reciban siempre la versión más reciente del service worker y no se queden atascados en una versión antigua de la app cacheada offline.
+
+### Dominio propio
+
+Una vez desplegado, en **Custom domains** dentro del proyecto de Pages puedes añadir tu propio dominio o subdominio (ej. `herramientas.tudominio.com`) — Cloudflare gestiona el certificado TLS automáticamente. Necesitas que el dominio esté gestionado por Cloudflare (o al menos delegar el DNS a Cloudflare para ese subdominio).
+
+### Verificación tras el deploy
+
+- Abre la URL que te da Cloudflare (`https://html-parser-xxx.pages.dev`) y confirma que "Cargar ejemplo" funciona en ambos modos (análisis simple y comparación).
+- Comprueba que la PWA es instalable: en Chrome/Edge debería aparecer un icono de instalación en la barra de direcciones (esto solo funciona sobre HTTPS, que Cloudflare Pages ya proporciona).
+- Revisa la consola del navegador: no debería haber errores de carga de módulos ni del service worker.
 
 ## PWA (instalable, funciona offline)
 
