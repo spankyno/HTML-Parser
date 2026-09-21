@@ -150,7 +150,7 @@ Revisión realizada sobre todo el código cliente (no hay backend que auditar). 
 | 2 | **Prototype pollution** en objetos usados como "mapa" con claves tomadas del HTML analizado (`id`, `meta[property]`, nombre de fichero en modo lote) | Baja (sin backend, impacto limitado al propio navegador del usuario) | ✅ Corregido — esos mapas usan `Object.create(null)` |
 | 3 | **Excepción no controlada** en el extractor de accesibilidad si un `id` contenía comillas y el navegador no soportaba `CSS.escape` — podía tumbar el análisis completo | Baja/Media (disponibilidad) | ✅ Corregido — `try/catch` + red de seguridad general (`runExtractorSafely`, `runDiffSafely`) para que un módulo que falle no tumbe los demás |
 | 4 | **XSS por HTML no escapado** al volcar datos extraídos de la página analizada en el DOM de resultados | — | ✅ Verificado, no encontrado — se auditaron todos los `innerHTML` y confirmé que cada valor de texto pasa por `esc()` antes de interpolarse; los únicos `<a href>` reales del código son estáticos (`example.js`), nunca se generan enlaces clicables con datos del usuario |
-| 5 | **Exfiltración de datos**: que el HTML pegado se enviara a algún sitio sin que el usuario lo sepa | — | ✅ Verificado, no encontrado — no hay ninguna llamada `fetch`/`XMLHttpRequest` en el código propio |
+| 5 | **Exfiltración de datos**: que el HTML pegado se enviara a algún sitio sin que el usuario lo sepa | — | ✅ Verificado — el HTML que pegas o subes para analizar nunca sale de tu navegador; ningún extractor hace peticiones de red. *(Nota: desde la incorporación del script de analítica de uso, la página sí carga `tracker.js` desde `aitors-hub-dashboard.asanchezgu.workers.dev`, que registra el uso de la app — ver más abajo. Es un servicio del propio autor, separado del análisis de HTML en sí, y su propia política de datos queda fuera del alcance de esta auditoría.)* |
 | 6 | **Ejecución de script del HTML analizado**: si pegar una página con `<script>` pudiera ejecutarse | — | ✅ Verificado, no aplica — `DOMParser` crea documentos con el scripting deshabilitado por especificación; nunca se inyecta el HTML analizado como página real |
 | 7 | **Cabeceras de seguridad** ausentes o incompletas en el despliegue | Baja | ✅ Añadidas en `_headers`: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` y una `Content-Security-Policy` explícita |
 
@@ -164,7 +164,9 @@ Tests de regresión para los puntos 1-3 en `test/security.test.js` (9 tests).
 
 ## Privacidad
 
-Todo el análisis ocurre en el navegador del usuario mediante `DOMParser`. El HTML pegado o subido nunca se envía a ningún servidor. En modo lote, si subes un `.zip`, se carga la librería [JSZip](https://stuk.github.io/jszip/) dinámicamente desde jsDelivr (`cdn.jsdelivr.net`) solo en ese momento — el fichero `.zip` en sí se procesa igualmente en tu navegador, no se sube a ningún sitio.
+El **HTML que analizas** (pegado, subido, o dentro de un `.zip` en modo lote) nunca se envía a ningún servidor — todo el procesamiento ocurre en tu navegador mediante `DOMParser`. En modo lote, si subes un `.zip`, se carga la librería [JSZip](https://stuk.github.io/jszip/) dinámicamente desde jsDelivr (`cdn.jsdelivr.net`) solo en ese momento — el fichero `.zip` en sí se procesa igualmente en tu navegador, no se sube a ningún sitio.
+
+**Aparte de eso**, la página carga un script de analítica de uso (`tracker.js`, servido desde `aitors-hub-dashboard.asanchezgu.workers.dev`) para medir visitas a la app — esto es independiente del análisis de HTML y no tiene acceso al contenido que pegas o subes; simplemente registra que alguien ha usado la herramienta.
 
 ## Licencia
 
