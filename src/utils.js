@@ -14,6 +14,12 @@ export function attr(el, name) {
 export function toCSV(rows) {
   return rows.map(r => r.map(v => {
     v = v === null || v === undefined ? '' : String(v);
+    // Mitigación de "CSV/Formula Injection": si una celda empieza por uno de
+    // estos caracteres, Excel/Sheets puede interpretarla como una fórmula al
+    // abrir el CSV (ej. un enlace o texto extraído de una página maliciosa
+    // que empiece por "=cmd|..."). Anteponemos un apóstrofo para forzar que
+    // se trate como texto, tal y como recomienda OWASP.
+    if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
     if (/[",\n]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
     return v;
   }).join(',')).join('\n');

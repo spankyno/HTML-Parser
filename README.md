@@ -140,6 +140,28 @@ El `manifest.json` y el `service-worker.js` cachean el "app shell" (HTML, CSS, J
 - Extensión de navegador que capture el HTML de la pestaña activa automáticamente.
 - Informe exportable único (PDF/HTML) combinando todos los módulos.
 
+## Auditoría de seguridad
+
+Revisión realizada sobre todo el código cliente (no hay backend que auditar). Hallazgos y estado:
+
+| # | Hallazgo | Severidad | Estado |
+|---|---|---|---|
+| 1 | **CSV/Formula Injection**: exportar a CSV una celda que empezara por `=`, `+`, `-` o `@` (ej. un `href` extraído de una página maliciosa) podía interpretarse como fórmula al abrirla en Excel/Sheets | Media | ✅ Corregido — `toCSV()` antepone `'` a esas celdas (mitigación estándar de OWASP) |
+| 2 | **Prototype pollution** en objetos usados como "mapa" con claves tomadas del HTML analizado (`id`, `meta[property]`, nombre de fichero en modo lote) | Baja (sin backend, impacto limitado al propio navegador del usuario) | ✅ Corregido — esos mapas usan `Object.create(null)` |
+| 3 | **Excepción no controlada** en el extractor de accesibilidad si un `id` contenía comillas y el navegador no soportaba `CSS.escape` — podía tumbar el análisis completo | Baja/Media (disponibilidad) | ✅ Corregido — `try/catch` + red de seguridad general (`runExtractorSafely`, `runDiffSafely`) para que un módulo que falle no tumbe los demás |
+| 4 | **XSS por HTML no escapado** al volcar datos extraídos de la página analizada en el DOM de resultados | — | ✅ Verificado, no encontrado — se auditaron todos los `innerHTML` y confirmé que cada valor de texto pasa por `esc()` antes de interpolarse; los únicos `<a href>` reales del código son estáticos (`example.js`), nunca se generan enlaces clicables con datos del usuario |
+| 5 | **Exfiltración de datos**: que el HTML pegado se enviara a algún sitio sin que el usuario lo sepa | — | ✅ Verificado, no encontrado — no hay ninguna llamada `fetch`/`XMLHttpRequest` en el código propio |
+| 6 | **Ejecución de script del HTML analizado**: si pegar una página con `<script>` pudiera ejecutarse | — | ✅ Verificado, no aplica — `DOMParser` crea documentos con el scripting deshabilitado por especificación; nunca se inyecta el HTML analizado como página real |
+| 7 | **Cabeceras de seguridad** ausentes o incompletas en el despliegue | Baja | ✅ Añadidas en `_headers`: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` y una `Content-Security-Policy` explícita |
+
+### Riesgos residuales aceptados (documentados, no bloqueantes)
+
+- **`style-src 'unsafe-inline'` en la CSP**: la app genera atributos `style="..."` inline en varios sitios (colores de estado, anchos de barra). Quitar `unsafe-inline` requeriría mover todo eso a clases CSS — cambio grande para el beneficio marginal que aporta aquí, dado que no hay inyección de HTML no escapado que pudiera explotarlo.
+- **JSZip cargado dinámicamente desde `cdn.jsdelivr.net`** (modo lote, solo al subir un `.zip`): está fijado a una versión exacta (`3.10.1`), pero un `import()` dinámico no soporta el atributo `integrity` (SRI) como sí lo soporta una etiqueta `<script>`. Si en algún momento quieres eliminar esta dependencia de terceros, la alternativa es añadir un paso de build que empaquete JSZip localmente — trade-off deliberado por mantener "cero build step".
+- Este proyecto no maneja datos sensibles del usuario ni tiene backend, lo que limita el impacto máximo de cualquier fallo aquí a la propia pestaña del navegador de quien lo usa.
+
+Tests de regresión para los puntos 1-3 en `test/security.test.js` (9 tests).
+
 ## Privacidad
 
 Todo el análisis ocurre en el navegador del usuario mediante `DOMParser`. El HTML pegado o subido nunca se envía a ningún servidor. En modo lote, si subes un `.zip`, se carga la librería [JSZip](https://stuk.github.io/jszip/) dinámicamente desde jsDelivr (`cdn.jsdelivr.net`) solo en ese momento — el fichero `.zip` en sí se procesa igualmente en tu navegador, no se sube a ningún sitio.

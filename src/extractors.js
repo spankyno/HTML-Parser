@@ -27,8 +27,8 @@ export function extractMeta(doc) {
     doc.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')
   ).map(l => ({ rel: attr(l, 'rel'), href: attr(l, 'href'), sizes: attr(l, 'sizes') }));
 
-  const og = {};
-  const twitter = {};
+  const og = Object.create(null);
+  const twitter = Object.create(null);
   doc.querySelectorAll('meta[property^="og:"]').forEach(m => { og[attr(m, 'property')] = attr(m, 'content'); });
   doc.querySelectorAll('meta[name^="twitter:"]').forEach(m => { twitter[attr(m, 'name')] = attr(m, 'content'); });
 
@@ -139,7 +139,7 @@ export function extractPlainText(doc) {
 
 export function extractTagCounts(doc) {
   const all = doc.querySelectorAll('*');
-  const counts = {};
+  const counts = Object.create(null);
   all.forEach(el => { const t = el.tagName.toLowerCase(); counts[t] = (counts[t] || 0) + 1; });
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   return { sorted, totalElements: all.length, count: all.length, flagged: false };
@@ -196,7 +196,17 @@ export function extractAccessibility(doc) {
     .filter(el => !['hidden', 'submit', 'button', 'image'].includes((el.getAttribute('type') || '').toLowerCase()));
   fields.forEach(el => {
     const id = el.getAttribute('id');
-    const hasLabelFor = id && doc.querySelector(`label[for="${(typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(id) : id}"]`);
+    let hasLabelFor = false;
+    if (id) {
+      try {
+        const selectorId = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(id) : id;
+        hasLabelFor = !!doc.querySelector(`label[for="${selectorId}"]`);
+      } catch (e) {
+        // Un id con caracteres que rompen el selector (ej. comillas) no debe
+        // tirar abajo todo el análisis — lo tratamos como "sin label".
+        hasLabelFor = false;
+      }
+    }
     const wrappedInLabel = el.closest('label');
     const hasAria = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
     if (!hasLabelFor && !wrappedInLabel && !hasAria) {
@@ -216,7 +226,11 @@ export function extractAccessibility(doc) {
   });
 
   // 5. IDs duplicados (rompe label[for], aria-labelledby, anclas...)
-  const idMap = {};
+  // Object.create(null) en vez de {}: si la página analizada tiene un id
+  // literal "__proto__" o "constructor", un objeto normal podría interpretar
+  // esa asignación como una escritura al prototipo en vez de una propiedad
+  // propia. Con un objeto sin prototipo, esa clase de "gadget" no existe.
+  const idMap = Object.create(null);
   doc.querySelectorAll('[id]').forEach(el => {
     const id = el.getAttribute('id');
     idMap[id] = (idMap[id] || 0) + 1;
@@ -271,3 +285,23 @@ export const EXTRACTOR_REGISTRY = [
   { id: 'text', label: 'Texto plano', run: extractPlainText },
   { id: 'misc', label: 'Otros hallazgos', run: extractMisc },
 ];
+
+// Ejecuta un extractor protegido con try/catch: un HTML lo bastante raro
+// como para tumbar un extractor concreto no debe tumbar todo el análisis
+// (ni en modo simple, ni en comparación, ni un fichero suelto del lote).
+export function runExtractorSafely(mod, doc, raw, documentImpl) {
+  try {
+    return mod.run(doc, raw, documentImpl);
+  } catch (e) {
+    console.error(`El extractor "${mod.id}" ha fallado:`, e);
+    return { count: 0, flagged: true, error: e.message || 'Error desconocido al procesar este módulo.' };
+  }
+}
+
+export function runAllExtractorsSafely(doc, raw, documentImpl) {
+  const data = {};
+  EXTRACTOR_REGISTRY.forEach(mod => {
+    data[mod.id] = runExtractorSafely(mod, doc, raw, documentImpl);
+  });
+  return data;
+}

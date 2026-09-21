@@ -1,6 +1,6 @@
-import { EXTRACTOR_REGISTRY } from './extractors.js';
+import { EXTRACTOR_REGISTRY, runAllExtractorsSafely } from './extractors.js';
 import { RENDERERS } from './render.js';
-import { DIFF_REGISTRY } from './diff.js';
+import { DIFF_REGISTRY, runDiffSafely } from './diff.js';
 import { DIFF_RENDERERS } from './diffRender.js';
 import { processBatch, extractHtmlFilesFromZip } from './batch.js';
 import { renderBatchSummary } from './batchRender.js';
@@ -71,8 +71,7 @@ function analyze() {
     return;
   }
 
-  currentData = {};
-  EXTRACTOR_REGISTRY.forEach(m => { currentData[m.id] = m.run(doc, raw, document); });
+  currentData = runAllExtractorsSafely(doc, raw, document);
   resultMode = 'single';
 
   els.statusline.textContent = `analizado — ${raw.length.toLocaleString('es-ES')} caracteres`;
@@ -98,15 +97,11 @@ function compare() {
     return;
   }
 
-  const dataA = {};
-  const dataB = {};
-  EXTRACTOR_REGISTRY.forEach(m => {
-    dataA[m.id] = m.run(docA, rawA, document);
-    dataB[m.id] = m.run(docB, rawB, document);
-  });
+  const dataA = runAllExtractorsSafely(docA, rawA, document);
+  const dataB = runAllExtractorsSafely(docB, rawB, document);
 
   currentDiff = {};
-  EXTRACTOR_REGISTRY.forEach(m => { currentDiff[m.id] = DIFF_REGISTRY[m.id](dataA[m.id], dataB[m.id]); });
+  EXTRACTOR_REGISTRY.forEach(m => { currentDiff[m.id] = runDiffSafely(m.id, dataA[m.id], dataB[m.id]); });
   resultMode = 'compare';
 
   const totalChanges = Object.values(currentDiff).reduce((s, d) => s + d.count, 0);
@@ -207,19 +202,29 @@ function selectModule(id) {
 
   if (resultMode === 'single') {
     const data = currentData[id];
-    const renderer = RENDERERS[id];
     els.panelTitle.textContent = titlePrefix + mod.label;
-    els.panelSub.textContent = `${data.count} elemento(s) encontrados`;
-    currentRender = renderer(data, (tableIndex) => {
-      const table = data.tables[tableIndex];
-      downloadFile(`tabla-${tableIndex + 1}.csv`, toCSV(table.rows), 'text/csv');
-    });
+    if (data.error) {
+      els.panelSub.textContent = 'este módulo no pudo procesarse';
+      currentRender = { html: `<div class="empty" style="border:1px solid var(--danger); color:var(--danger);">Este módulo falló al analizar el HTML: ${data.error}. El resto de módulos no se ha visto afectado.</div>` };
+    } else {
+      const renderer = RENDERERS[id];
+      els.panelSub.textContent = `${data.count} elemento(s) encontrados`;
+      currentRender = renderer(data, (tableIndex) => {
+        const table = data.tables[tableIndex];
+        downloadFile(`tabla-${tableIndex + 1}.csv`, toCSV(table.rows), 'text/csv');
+      });
+    }
   } else {
     const d = currentDiff[id];
-    const renderer = DIFF_RENDERERS[id];
     els.panelTitle.textContent = mod.label + ' — comparación';
-    els.panelSub.textContent = `${d.count} cambio(s)`;
-    currentRender = renderer(d);
+    if (d.error) {
+      els.panelSub.textContent = 'este módulo no pudo compararse';
+      currentRender = { html: `<div class="empty" style="border:1px solid var(--danger); color:var(--danger);">${d.error}</div>` };
+    } else {
+      const renderer = DIFF_RENDERERS[id];
+      els.panelSub.textContent = `${d.count} cambio(s)`;
+      currentRender = renderer(d);
+    }
   }
 
   els.panelBody.innerHTML = currentRender.html || '';

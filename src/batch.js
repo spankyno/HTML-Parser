@@ -1,4 +1,4 @@
-import { EXTRACTOR_REGISTRY } from './extractors.js';
+import { EXTRACTOR_REGISTRY, runAllExtractorsSafely } from './extractors.js';
 
 // Recibe una lista de { name, raw } (nombre de fichero + HTML como texto) y
 // devuelve un resumen por fichero + los datos completos de cada uno (para
@@ -7,7 +7,7 @@ import { EXTRACTOR_REGISTRY } from './extractors.js';
 
 export function processBatch(files) {
   const rows = [];
-  const details = {};
+  const details = Object.create(null);
 
   files.forEach(({ name, raw }) => {
     let doc;
@@ -18,23 +18,22 @@ export function processBatch(files) {
       return;
     }
 
-    const data = {};
-    EXTRACTOR_REGISTRY.forEach(mod => { data[mod.id] = mod.run(doc, raw, typeof document !== 'undefined' ? document : null); });
+    const data = runAllExtractorsSafely(doc, raw, typeof document !== 'undefined' ? document : null);
     details[name] = data;
 
     rows.push({
       name,
       error: null,
-      title: data.meta.title || '(sin título)',
-      words: data.text.words,
-      links: data.links.count,
-      images: data.images.count,
-      missingAlt: data.images.missingAlt,
-      h1Count: data.headings.h1Count,
-      tables: data.tables.count,
-      forms: data.forms.count,
-      a11yErrors: data.a11y.errors,
-      a11yWarnings: data.a11y.warnings,
+      title: (data.meta && !data.meta.error) ? (data.meta.title || '(sin título)') : '(error al leer meta)',
+      words: (data.text && !data.text.error) ? data.text.words : 0,
+      links: (data.links && !data.links.error) ? data.links.count : 0,
+      images: (data.images && !data.images.error) ? data.images.count : 0,
+      missingAlt: (data.images && !data.images.error) ? data.images.missingAlt : 0,
+      h1Count: (data.headings && !data.headings.error) ? data.headings.h1Count : 0,
+      tables: (data.tables && !data.tables.error) ? data.tables.count : 0,
+      forms: (data.forms && !data.forms.error) ? data.forms.count : 0,
+      a11yErrors: (data.a11y && !data.a11y.error) ? data.a11y.errors : 0,
+      a11yWarnings: (data.a11y && !data.a11y.error) ? data.a11y.warnings : 0,
     });
   });
 

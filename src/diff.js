@@ -148,3 +148,19 @@ export const DIFF_REGISTRY = {
   assets: diffAssets, forms: diffForms, tables: diffTables, text: diffText,
   tagcounts: diffTagCounts, misc: diffMisc, a11y: diffAccessibility,
 };
+
+// Igual que runExtractorSafely en extractors.js: si alguno de los dos lados
+// (A o B) tuvo un error al extraer, o el propio cálculo del diff falla, no
+// debe tumbar la comparación completa — se marca ese módulo como no
+// disponible y se sigue con el resto.
+export function runDiffSafely(id, dataA, dataB) {
+  try {
+    if (dataA?.error || dataB?.error) {
+      return { count: 0, flagged: true, error: 'No se pudo comparar: uno de los dos análisis falló en este módulo.' };
+    }
+    return DIFF_REGISTRY[id](dataA, dataB);
+  } catch (e) {
+    console.error(`El diff de "${id}" ha fallado:`, e);
+    return { count: 0, flagged: true, error: e.message || 'Error desconocido al comparar este módulo.' };
+  }
+}
