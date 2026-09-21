@@ -31,6 +31,7 @@
     <div class="row modetabs">
       <button class="modetab active" id="modeSingleBtn" type="button">Analizar un HTML</button>
       <button class="modetab" id="modeCompareBtn" type="button">Comparar dos versiones</button>
+      <button class="modetab" id="modeBatchBtn" type="button">Modo lote</button>
     </div>
 
     <div id="singleInput">
@@ -77,6 +78,24 @@
         <button class="ghost" id="exampleCompareBtn">Cargar ejemplo</button>
       </div>
     </div>
+
+    <div id="batchInput" style="display:none;">
+      <div class="row">
+        <label class="filebtn">
+          subir varios .html
+          <input type="file" id="batchFileInput" accept=".html,.htm,text/html" multiple style="display:none">
+        </label>
+        <label class="filebtn">
+          subir un .zip
+          <input type="file" id="batchZipInput" accept=".zip" style="display:none">
+        </label>
+        <span class="hint" id="batchFileList">ningún fichero seleccionado</span>
+      </div>
+      <div class="actions">
+        <button id="batchAnalyzeBtn">Analizar lote</button>
+        <button class="ghost" id="clearBatchBtn">Limpiar</button>
+      </div>
+    </div>
   </div>
 
   <div class="layout" id="layout" style="display:none;">
@@ -88,6 +107,7 @@
           <div class="sub" id="panelSub"></div>
         </div>
         <div class="panelhead-controls">
+          <button class="ghost" id="backToBatchBtn" style="display:none;">← Volver al resumen del lote</button>
           <input type="text" id="filterbox" placeholder="filtrar filas…">
           <div class="exportbar" id="exportbar"></div>
         </div>

@@ -1,6 +1,6 @@
 # HTML Parser
 
-Analizador de código fuente HTML que se ejecuta 100% en el navegador (client-side). Pega o sube un archivo `.html` y obtén un desglose completo: metadatos SEO, enlaces, imágenes, tablas, formularios, scripts, conteo de etiquetas, texto plano y otros hallazgos (JSON-LD, comentarios ocultos, emails, colores). 
+Analizador de código fuente HTML que se ejecuta 100% en el navegador (client-side). Pega o sube un archivo `.html` y obtén un desglose completo: metadatos SEO, enlaces, imágenes, tablas, formularios, scripts, conteo de etiquetas, texto plano y otros hallazgos (JSON-LD, comentarios ocultos, emails, colores).
 
 No hay backend. No hay paso de compilación (bundling): los módulos JS se cargan nativamente en el navegador vía `<script type="module">`. Es instalable como PWA y funciona offline tras la primera visita.
 
@@ -17,11 +17,14 @@ No hay backend. No hay paso de compilación (bundling): los módulos JS se carga
 │   ├── render.js            # convierte los datos de cada extractor en HTML
 │   ├── diff.js                # compara los datos de dos análisis (modo A/B)
 │   ├── diffRender.js          # convierte los diffs en HTML (añadido/eliminado/cambiado)
-│   ├── app.js                  # orquestación: wiring de la UI, modos, eventos, exportación
-│   └── example.js              # HTML de ejemplo (versión A y B) usado por "Cargar ejemplo"
+│   ├── batch.js                # procesa varios ficheros y genera el resumen del lote
+│   ├── batchRender.js          # tabla resumen del lote + navegación al detalle
+│   ├── app.js                    # orquestación: wiring de la UI, modos, eventos, exportación
+│   └── example.js                # HTML de ejemplo (versión A y B) usado por "Cargar ejemplo"
 ├── test/
 │   ├── extractors.test.js   # tests de los extractores con Vitest + jsdom
-│   └── diff.test.js          # tests del motor de comparación
+│   ├── diff.test.js          # tests del motor de comparación
+│   └── batch.test.js         # tests del procesamiento en lote
 ├── .github/workflows/test.yml  # CI: corre los tests en cada push/PR
 ├── package.json
 └── vitest.config.js
@@ -132,14 +135,14 @@ El `manifest.json` y el `service-worker.js` cachean el "app shell" (HTML, CSS, J
 ## Roadmap (próximos pasos posibles)
 
 - ~~Módulo de accesibilidad~~ ✅ implementado (`a11y`).
-- ~~Modo comparación~~ ✅ implementado: pega dos versiones (A/B) y ve qué cambió en cada módulo (`src/diff.js` + `src/diffRender.js`).
+- ~~Modo comparación~~ ✅ implementado (`src/diff.js` + `src/diffRender.js`).
+- ~~Modo lote~~ ✅ implementado (`src/batch.js` + `src/batchRender.js`): sube varios `.html` o un `.zip`, obtén una tabla resumen por fichero y entra al detalle completo de cualquiera de ellos.
 - Extensión de navegador que capture el HTML de la pestaña activa automáticamente.
-- Modo lote: analizar varios `.html` o un `.zip` de un sitio entero de golpe.
 - Informe exportable único (PDF/HTML) combinando todos los módulos.
 
 ## Privacidad
 
-Todo el análisis ocurre en el navegador del usuario mediante `DOMParser`. El HTML pegado o subido nunca se envía a ningún servidor.
+Todo el análisis ocurre en el navegador del usuario mediante `DOMParser`. El HTML pegado o subido nunca se envía a ningún servidor. En modo lote, si subes un `.zip`, se carga la librería [JSZip](https://stuk.github.io/jszip/) dinámicamente desde jsDelivr (`cdn.jsdelivr.net`) solo en ese momento — el fichero `.zip` en sí se procesa igualmente en tu navegador, no se sube a ningún sitio.
 
 ## Licencia
 

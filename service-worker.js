@@ -3,7 +3,7 @@
 // dinámicos que sincronizar, una estrategia "cache first, network fallback"
 // es suficiente — no hace falta nada más sofisticado.
 
-const CACHE_NAME = 'html-parser-v2';
+const CACHE_NAME = 'html-parser-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -14,6 +14,8 @@ const APP_SHELL = [
   './src/render.js',
   './src/diff.js',
   './src/diffRender.js',
+  './src/batch.js',
+  './src/batchRender.js',
   './src/utils.js',
   './src/example.js',
 ];

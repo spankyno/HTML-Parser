@@ -2,6 +2,8 @@ import { EXTRACTOR_REGISTRY } from './extractors.js';
 import { RENDERERS } from './render.js';
 import { DIFF_REGISTRY } from './diff.js';
 import { DIFF_RENDERERS } from './diffRender.js';
+import { processBatch, extractHtmlFilesFromZip } from './batch.js';
+import { renderBatchSummary } from './batchRender.js';
 import { downloadFile, toCSV } from './utils.js';
 import { EXAMPLE_HTML, EXAMPLE_HTML_B } from './example.js';
 
@@ -28,17 +30,31 @@ const els = {
   panelBody: document.getElementById('panelBody'),
   exportbar: document.getElementById('exportbar'),
   filterbox: document.getElementById('filterbox'),
+  backToBatchBtn: document.getElementById('backToBatchBtn'),
   modeSingleBtn: document.getElementById('modeSingleBtn'),
   modeCompareBtn: document.getElementById('modeCompareBtn'),
+  modeBatchBtn: document.getElementById('modeBatchBtn'),
   singleInput: document.getElementById('singleInput'),
   compareInput: document.getElementById('compareInput'),
+  batchInput: document.getElementById('batchInput'),
+  batchFileInput: document.getElementById('batchFileInput'),
+  batchZipInput: document.getElementById('batchZipInput'),
+  batchFileList: document.getElementById('batchFileList'),
+  batchAnalyzeBtn: document.getElementById('batchAnalyzeBtn'),
+  clearBatchBtn: document.getElementById('clearBatchBtn'),
 };
 
-let mode = 'single'; // 'single' | 'compare'
-let currentData = null;   // modo single: id -> datos del extractor
-let currentDiff = null;   // modo compare: id -> datos del diff
+let mode = 'single';       // qué panel de entrada se ve: 'single' | 'compare' | 'batch'
+let resultMode = 'single'; // cómo se renderiza el panel de resultados: 'single' | 'compare'
+let currentData = null;    // id -> datos del extractor (single, o detalle de un fichero del lote)
+let currentDiff = null;    // id -> datos del diff (compare)
 let currentRender = null;
 let activeId = 'meta';
+
+let pendingBatchFiles = []; // [{name, raw}] listos para analizar
+let batchResult = null;     // { rows, details } tras procesar
+let batchView = 'summary';  // 'summary' | 'detail'
+let batchActiveFile = null;
 
 // ---------- Modo: analizar uno ----------
 function analyze() {
@@ -56,11 +72,13 @@ function analyze() {
   }
 
   currentData = {};
-  currentDiff = null;
-  EXTRACTOR_REGISTRY.forEach(mod => { currentData[mod.id] = mod.run(doc, raw, document); });
+  EXTRACTOR_REGISTRY.forEach(m => { currentData[m.id] = m.run(doc, raw, document); });
+  resultMode = 'single';
 
   els.statusline.textContent = `analizado — ${raw.length.toLocaleString('es-ES')} caracteres`;
-  showResults();
+  els.layout.classList.remove('no-nav');
+  els.backToBatchBtn.style.display = 'none';
+  showModuleResults();
 }
 
 // ---------- Modo: comparar dos ----------
@@ -82,23 +100,86 @@ function compare() {
 
   const dataA = {};
   const dataB = {};
-  EXTRACTOR_REGISTRY.forEach(mod => {
-    dataA[mod.id] = mod.run(docA, rawA, document);
-    dataB[mod.id] = mod.run(docB, rawB, document);
+  EXTRACTOR_REGISTRY.forEach(m => {
+    dataA[m.id] = m.run(docA, rawA, document);
+    dataB[m.id] = m.run(docB, rawB, document);
   });
 
   currentDiff = {};
-  currentData = null;
-  EXTRACTOR_REGISTRY.forEach(mod => {
-    currentDiff[mod.id] = DIFF_REGISTRY[mod.id](dataA[mod.id], dataB[mod.id]);
-  });
+  EXTRACTOR_REGISTRY.forEach(m => { currentDiff[m.id] = DIFF_REGISTRY[m.id](dataA[m.id], dataB[m.id]); });
+  resultMode = 'compare';
 
   const totalChanges = Object.values(currentDiff).reduce((s, d) => s + d.count, 0);
   els.statusline.textContent = `comparado — ${totalChanges} cambio(s) detectados en total`;
-  showResults();
+  els.layout.classList.remove('no-nav');
+  els.backToBatchBtn.style.display = 'none';
+  showModuleResults();
 }
 
-function showResults() {
+// ---------- Modo lote ----------
+function updateBatchFileListHint() {
+  els.batchFileList.textContent = pendingBatchFiles.length
+    ? `${pendingBatchFiles.length} fichero(s) listos: ${pendingBatchFiles.map(f => f.name).slice(0, 4).join(', ')}${pendingBatchFiles.length > 4 ? '…' : ''}`
+    : 'ningún fichero seleccionado';
+}
+
+async function loadJSZip() {
+  // Import dinámico: solo se carga si el usuario realmente sube un .zip,
+  // para no penalizar a quien usa la app en modo simple/comparación.
+  const mod = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+  return mod.default || mod;
+}
+
+function runBatch() {
+  if (!pendingBatchFiles.length) {
+    els.statusline.textContent = 'sube uno o varios .html (o un .zip) antes de analizar el lote';
+    return;
+  }
+  batchResult = processBatch(pendingBatchFiles);
+  batchView = 'summary';
+  els.statusline.textContent = `lote analizado — ${batchResult.rows.length} fichero(s)`;
+  showBatchSummary();
+}
+
+function showBatchSummary() {
+  batchView = 'summary';
+  els.layout.style.display = 'grid';
+  els.layout.classList.add('no-nav');
+  els.emptyState.style.display = 'none';
+  els.backToBatchBtn.style.display = 'none';
+  els.filterbox.style.display = 'none';
+
+  els.panelTitle.textContent = 'Resumen del lote';
+  els.panelSub.textContent = `${batchResult.rows.length} fichero(s) procesados`;
+
+  currentRender = renderBatchSummary(batchResult.rows, (filename) => showBatchDetail(filename));
+  els.panelBody.innerHTML = currentRender.html;
+  if (currentRender.afterRender) currentRender.afterRender(els.panelBody);
+
+  els.exportbar.innerHTML = '';
+  if (currentRender.exportData) {
+    const btn = document.createElement('button');
+    btn.className = 'ghost';
+    btn.textContent = 'Exportar CSV';
+    btn.addEventListener('click', () => downloadFile(currentRender.exportName, currentRender.exportData(), currentRender.exportType));
+    els.exportbar.appendChild(btn);
+  }
+}
+
+function showBatchDetail(filename) {
+  batchView = 'detail';
+  batchActiveFile = filename;
+  currentData = batchResult.details[filename];
+  resultMode = 'single';
+  els.layout.classList.remove('no-nav');
+  els.backToBatchBtn.style.display = 'inline-block';
+  showModuleResults();
+}
+
+els.backToBatchBtn.addEventListener('click', showBatchSummary);
+
+// ---------- Renderizado de módulos (compartido por single, compare-detail y batch-detail) ----------
+function showModuleResults() {
   els.layout.style.display = 'grid';
   els.emptyState.style.display = 'none';
   renderNav();
@@ -106,7 +187,7 @@ function showResults() {
 }
 
 function renderNav() {
-  const source = mode === 'single' ? currentData : currentDiff;
+  const source = resultMode === 'single' ? currentData : currentDiff;
   let html = '<div class="modhead">MÓDULOS</div>';
   EXTRACTOR_REGISTRY.forEach(m => {
     const d = source[m.id];
@@ -122,11 +203,12 @@ function renderNav() {
 function selectModule(id) {
   activeId = id;
   const mod = EXTRACTOR_REGISTRY.find(m => m.id === id);
+  const titlePrefix = (mode === 'batch' && batchView === 'detail') ? `[${batchActiveFile}] ` : '';
 
-  if (mode === 'single') {
+  if (resultMode === 'single') {
     const data = currentData[id];
     const renderer = RENDERERS[id];
-    els.panelTitle.textContent = mod.label;
+    els.panelTitle.textContent = titlePrefix + mod.label;
     els.panelSub.textContent = `${data.count} elemento(s) encontrados`;
     currentRender = renderer(data, (tableIndex) => {
       const table = data.tables[tableIndex];
@@ -180,20 +262,29 @@ function applyFilter(query) {
   }
 }
 
-// ---------- Cambio de modo ----------
+// ---------- Cambio de modo de entrada ----------
 function setMode(newMode) {
   mode = newMode;
   els.modeSingleBtn.classList.toggle('active', mode === 'single');
   els.modeCompareBtn.classList.toggle('active', mode === 'compare');
+  els.modeBatchBtn.classList.toggle('active', mode === 'batch');
   els.singleInput.style.display = mode === 'single' ? 'block' : 'none';
   els.compareInput.style.display = mode === 'compare' ? 'block' : 'none';
+  els.batchInput.style.display = mode === 'batch' ? 'block' : 'none';
   els.layout.style.display = 'none';
+  els.layout.classList.remove('no-nav');
   els.emptyState.style.display = 'grid';
-  els.statusline.textContent = mode === 'single' ? 'esperando código fuente…' : 'esperando las dos versiones (A y B)…';
+  els.backToBatchBtn.style.display = 'none';
+  els.statusline.textContent = {
+    single: 'esperando código fuente…',
+    compare: 'esperando las dos versiones (A y B)…',
+    batch: 'sube varios .html o un .zip…',
+  }[mode];
 }
 
 els.modeSingleBtn.addEventListener('click', () => setMode('single'));
 els.modeCompareBtn.addEventListener('click', () => setMode('compare'));
+els.modeBatchBtn.addEventListener('click', () => setMode('batch'));
 
 // ---------- Wiring modo simple ----------
 els.analyzeBtn.addEventListener('click', analyze);
@@ -247,6 +338,49 @@ els.fileInputB.addEventListener('change', (e) => {
   reader.readAsText(file);
 });
 
+// ---------- Wiring modo lote ----------
+els.batchFileInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  const loaded = await Promise.all(files.map(f => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve({ name: f.name, raw: ev.target.result });
+    reader.readAsText(f);
+  })));
+  pendingBatchFiles = pendingBatchFiles.concat(loaded);
+  updateBatchFileListHint();
+});
+
+els.batchZipInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  els.batchFileList.textContent = 'leyendo .zip…';
+  try {
+    const JSZip = await loadJSZip();
+    const zip = await JSZip.loadAsync(file);
+    const files = await extractHtmlFilesFromZip(zip);
+    if (!files.length) {
+      els.batchFileList.textContent = 'el .zip no contiene ficheros .html/.htm';
+      return;
+    }
+    pendingBatchFiles = pendingBatchFiles.concat(files);
+    updateBatchFileListHint();
+  } catch (err) {
+    console.error(err);
+    els.batchFileList.textContent = 'no se pudo leer el .zip (¿está corrupto o no es un zip válido?)';
+  }
+});
+
+els.batchAnalyzeBtn.addEventListener('click', runBatch);
+els.clearBatchBtn.addEventListener('click', () => {
+  pendingBatchFiles = [];
+  batchResult = null;
+  updateBatchFileListHint();
+  els.layout.style.display = 'none';
+  els.layout.classList.remove('no-nav');
+  els.emptyState.style.display = 'grid';
+  els.statusline.textContent = 'sube varios .html o un .zip…';
+});
+
 els.filterbox.addEventListener('input', () => applyFilter(els.filterbox.value));
 
 function updateCharCount() {
@@ -264,3 +398,4 @@ if ('serviceWorker' in navigator) {
 }
 
 updateCharCount();
+updateBatchFileListHint();
